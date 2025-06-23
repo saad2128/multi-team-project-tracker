@@ -52,21 +52,22 @@ const CONFIG = {
     ]
   },
   
-  // Column mappings
+   // Column mappings
   STATUS_COLUMN: 'status',
   SERIAL_COLUMN: 'sr_no',
   REPO_COLUMN: 'repo_name',
   
-  // Status values mapping
+  // Status values mapping - UPDATED WITH REWORK
   STATUS_VALUES: {
     NOT_STARTED: ['Not Started', 'TODO', 'Backlog', '', 'Pending', 'New'],
     IN_PROGRESS: ['In-Progress', 'Working', 'Started', 'Assigned', 'Development', 'Coding'],
-    REVIEW: ['Ready for Review', 'In-Review', 'Review', 'Under Review', 'Reviewing'],
+    REVIEW: ['Ready for Review', 'In-Review', 'Review', 'Under Review', 'Reviewing','Lead Review'],
     COMPLETED: ['Completed', 'Done', 'Finished', 'Closed', 'Deployed', 'Live'],
-    ISSUES: ['In-Complete Data', 'Incomplete Data', 'Data Issues', 'Missing Data', 'Invalid Data', 'Data Problem']
+    ISSUES: ['In-Complete Data', 'Incomplete Data', 'Data Issues', 'Missing Data', 'Invalid Data', 'Data Problem','Rejected'],
+    REWORK: ['Rework', 'Redo', 'Needs Rework', 'Rework Required', 'Fix Required', 'Revision Needed','Changes Requested']
   },
   
-  // Dashboard styling
+  // Dashboard styling - UPDATED WITH REWORK COLOR
   COLORS: {
     HEADER: '#1a73e8',
     COMPLETED: '#34a853',
@@ -74,6 +75,7 @@ const CONFIG = {
     REVIEW: '#4285f4',
     NOT_STARTED: '#9e9e9e',
     ISSUES: '#ea4335',
+    REWORK: '#ff6d01', // Orange color for rework
     BORDER: '#dadce0',
     LIGHT_GRAY: '#f8f9fa'
   }
@@ -115,7 +117,7 @@ function createMasterTracker() {
 }
 
 /**
- * Collects data from all team sheets
+ * Collects data from all team sheets - UPDATED WITH REWORK
  */
 function collectAllTeamsData() {
   const allData = {
@@ -126,7 +128,8 @@ function collectAllTeamsData() {
       inProgress: 0,
       review: 0,
       notStarted: 0,
-      issues: 0
+      issues: 0,
+      rework: 0 // Added rework to overall stats
     }
   };
   
@@ -138,13 +141,14 @@ function collectAllTeamsData() {
           const teamData = getTeamData(team);
           allData.teams.push(teamData);
           
-          // Update overall stats
+          // Update overall stats - UPDATED WITH REWORK
           allData.overallStats.totalTasks += teamData.stats.total;
           allData.overallStats.completed += teamData.stats.completed;
           allData.overallStats.inProgress += teamData.stats.inProgress;
           allData.overallStats.review += teamData.stats.review;
           allData.overallStats.notStarted += teamData.stats.notStarted;
           allData.overallStats.issues += teamData.stats.issues;
+          allData.overallStats.rework += teamData.stats.rework;
           
         } catch (error) {
           console.error(`Error processing team ${team.name}:`, error);
@@ -157,7 +161,7 @@ function collectAllTeamsData() {
 }
 
 /**
- * Gets data from a single team sheet
+ * Gets data from a single team sheet - UPDATED WITH REWORK
  */
 function getTeamData(teamConfig) {
   const sheet = SpreadsheetApp.openById(teamConfig.id).getActiveSheet();
@@ -172,7 +176,8 @@ function getTeamData(teamConfig) {
         inProgress: 0,
         review: 0,
         notStarted: 0,
-        issues: 0
+        issues: 0,
+        rework: 0 // Added rework initialization
       },
       tasks: []
     };
@@ -184,7 +189,7 @@ function getTeamData(teamConfig) {
   const serialCol = headers.findIndex(h => h.toString().toLowerCase() === CONFIG.SERIAL_COLUMN.toLowerCase());
   const repoCol = headers.findIndex(h => h.toString().toLowerCase() === CONFIG.REPO_COLUMN.toLowerCase());
   
-  // Process tasks
+  // Process tasks - UPDATED WITH REWORK
   const tasks = [];
   const stats = {
     total: 0,
@@ -192,7 +197,8 @@ function getTeamData(teamConfig) {
     inProgress: 0,
     review: 0,
     notStarted: 0,
-    issues: 0
+    issues: 0,
+    rework: 0 // Added rework to stats
   };
   
   for (let i = 1; i < data.length; i++) {
@@ -213,6 +219,14 @@ function getTeamData(teamConfig) {
     }
   }
   
+  // DEBUGGING: Log the stats to check for issues
+  console.log(`Team ${teamConfig.name} stats:`, stats);
+  
+  // FIXED: Ensure all stats are integers
+  Object.keys(stats).forEach(key => {
+    stats[key] = parseInt(stats[key]) || 0;
+  });
+  
   return {
     config: teamConfig,
     stats: stats,
@@ -221,7 +235,7 @@ function getTeamData(teamConfig) {
 }
 
 /**
- * Categorizes status based on CONFIG.STATUS_VALUES
+ * Categorizes status based on CONFIG.STATUS_VALUES - UPDATED WITH REWORK
  */
 function categorizeStatus(status) {
   const normalizedStatus = status.toString().toLowerCase().trim();
@@ -234,6 +248,7 @@ function categorizeStatus(status) {
         case 'REVIEW': return 'review';
         case 'COMPLETED': return 'completed';
         case 'ISSUES': return 'issues';
+        case 'REWORK': return 'rework'; // Added rework case
       }
     }
   }
@@ -292,7 +307,7 @@ function createDashboardHeader(sheet, startRow) {
 }
 
 /**
- * Creates overall progress section
+ * Creates overall progress section - UPDATED WITH REWORK
  */
 function createOverallProgress(sheet, stats, startRow) {
   // Section header
@@ -308,7 +323,7 @@ function createOverallProgress(sheet, stats, startRow) {
   const completionPercentage = (stats.completed / CONFIG.PROJECT_TARGET * 100).toFixed(1);
   const progressPercentage = ((stats.completed + stats.inProgress + stats.review) / CONFIG.PROJECT_TARGET * 100).toFixed(1);
   
-  // Create progress cards
+  // Create progress cards - UPDATED WITH REWORK
   const cards = [
     {
       label: 'Project Target',
@@ -334,25 +349,45 @@ function createOverallProgress(sheet, stats, startRow) {
       label: 'In Review',
       value: stats.review.toLocaleString(),
       color: CONFIG.COLORS.REVIEW
+    },
+    {
+      label: 'Rework', // Added rework card
+      value: stats.rework.toLocaleString(),
+      color: CONFIG.COLORS.REWORK
+    },
+    {
+      label: 'Issues',
+      value: stats.issues.toLocaleString(),
+      color: CONFIG.COLORS.ISSUES
     }
   ];
   
+  // Display cards in two rows to accommodate the new rework card
   cards.forEach((card, index) => {
-    const col = (index * 2) + 1;
+    let row, col;
+    if (index < 4) {
+      // First row: Target, Total Tasks, Completed, In Progress
+      row = progressRow;
+      col = (index * 2) + 1;
+    } else {
+      // Second row: Review, Rework, Issues
+      row = progressRow + 3;
+      col = ((index - 4) * 2) + 1;
+    }
     
     // Label
-    sheet.getRange(progressRow, col).setValue(card.label);
-    sheet.getRange(progressRow, col).setFontWeight('bold');
+    sheet.getRange(row, col).setValue(card.label);
+    sheet.getRange(row, col).setFontWeight('bold');
     
     // Value
-    sheet.getRange(progressRow + 1, col).setValue(card.value);
-    sheet.getRange(progressRow + 1, col).setFontSize(14);
-    sheet.getRange(progressRow + 1, col).setFontColor(card.color);
-    sheet.getRange(progressRow + 1, col).setFontWeight('bold');
+    sheet.getRange(row + 1, col).setValue(card.value);
+    sheet.getRange(row + 1, col).setFontSize(14);
+    sheet.getRange(row + 1, col).setFontColor(card.color);
+    sheet.getRange(row + 1, col).setFontWeight('bold');
   });
   
   // Progress bar
-  const progressBarRow = progressRow + 3;
+  const progressBarRow = progressRow + 6;
   sheet.getRange(progressBarRow, 1).setValue('Overall Completion:');
   sheet.getRange(progressBarRow, 1).setFontWeight('bold');
   
@@ -363,22 +398,22 @@ function createOverallProgress(sheet, stats, startRow) {
 }
 
 /**
- * Creates team statistics table
+ * Creates team statistics table - UPDATED WITH REWORK COLUMN
  */
 function createTeamStatisticsTable(sheet, teams, startRow) {
   // Section header
-  sheet.getRange(startRow, 1, 1, 10).merge();
+  sheet.getRange(startRow, 1, 1, 14).merge(); // Extended to accommodate new column
   const sectionHeader = sheet.getRange(startRow, 1);
   sectionHeader.setValue('TEAM STATISTICS');
   sectionHeader.setFontSize(16);
   sectionHeader.setFontWeight('bold');
   sectionHeader.setBackground(CONFIG.COLORS.LIGHT_GRAY);
   
-  // Table headers
+  // Table headers - UPDATED WITH REWORK
   const headerRow = startRow + 2;
   const headers = [
     'Team Name', 'Lead', 'Week', 'Developers', 'Capacity',
-    'Total Tasks', 'Completed', 'In Progress', 'Review', 'Issues', 'Progress %', 'Sheet Link'
+    'Total Tasks', 'Completed', 'In Progress', 'Review', 'Rework', 'Issues', 'Status Total', 'Progress %', 'Sheet Link'
   ];
   
   headers.forEach((header, index) => {
@@ -390,24 +425,31 @@ function createTeamStatisticsTable(sheet, teams, startRow) {
     cell.setBorder(true, true, true, true, false, false);
   });
   
-  // Team data rows
+  // Team data rows - UPDATED WITH REWORK
   let dataRow = headerRow + 1;
   teams.forEach(team => {
     const progressPercentage = team.stats.total > 0 
       ? (team.stats.completed / team.stats.total * 100).toFixed(1)
       : 0;
     
+    // Calculate status total (sum of all status counts) - UPDATED WITH REWORK
+    const statusTotal = parseInt(team.stats.completed) + parseInt(team.stats.inProgress) + 
+                       parseInt(team.stats.review) + parseInt(team.stats.rework) + parseInt(team.stats.issues);
+    
+    // UPDATED: Include rework in row data
     const rowData = [
       team.config.name,
       team.config.leadName,
       `Week ${team.config.weekNumber}`,
-      team.config.developers,
-      team.config.weeklyCapacity,
-      team.stats.total,
-      team.stats.completed,
-      team.stats.inProgress,
-      team.stats.review,
-      team.stats.issues,
+      parseInt(team.config.developers) || 0,
+      parseInt(team.config.weeklyCapacity) || 0,
+      parseInt(team.stats.total) || 0,
+      parseInt(team.stats.completed) || 0,
+      parseInt(team.stats.inProgress) || 0,
+      parseInt(team.stats.review) || 0,
+      parseInt(team.stats.rework) || 0, // Added rework column
+      parseInt(team.stats.issues) || 0,
+      statusTotal, // Status total column
       `${progressPercentage}%`,
       `=HYPERLINK("https://docs.google.com/spreadsheets/d/${team.config.id}", "Open Sheet")`
     ];
@@ -416,16 +458,36 @@ function createTeamStatisticsTable(sheet, teams, startRow) {
       const cell = sheet.getRange(dataRow, index + 1);
       cell.setValue(value);
       
-      // Style specific columns
+      // Apply number formatting to numeric columns
+      if (index >= 3 && index <= 11) { // Numeric columns (developers through status total)
+        cell.setNumberFormat('0'); // Format as whole numbers
+      }
+      
+      // Style specific columns - UPDATED WITH REWORK STYLING
       if (index === 6) { // Completed column
         cell.setFontColor(CONFIG.COLORS.COMPLETED);
         cell.setFontWeight('bold');
-      } else if (index === 9) { // Issues column
-        if (value > 0) {
+      } else if (index === 9) { // Rework column
+        if (parseInt(value) > 0) {
+          cell.setFontColor(CONFIG.COLORS.REWORK);
+          cell.setFontWeight('bold');
+        }
+      } else if (index === 10) { // Issues column
+        if (parseInt(value) > 0) {
           cell.setFontColor(CONFIG.COLORS.ISSUES);
           cell.setFontWeight('bold');
         }
-      } else if (index === 10) { // Progress column
+      } else if (index === 11) { // Status Total column - HIGHLIGHT IF MISMATCH
+        const totalTasks = parseInt(team.stats.total) || 0;
+        if (statusTotal !== totalTasks) {
+          cell.setBackground('#ffcccb'); // Light red background for mismatch
+          cell.setFontColor(CONFIG.COLORS.ISSUES);
+          cell.setFontWeight('bold');
+        } else {
+          cell.setFontColor(CONFIG.COLORS.COMPLETED);
+          cell.setFontWeight('bold');
+        }
+      } else if (index === 12) { // Progress column
         const progress = parseFloat(value);
         if (progress >= 80) {
           cell.setFontColor(CONFIG.COLORS.COMPLETED);
@@ -495,11 +557,11 @@ function createProgressCharts(sheet, data, startRow) {
 }
 
 /**
- * Creates detailed status breakdown
+ * Creates detailed status breakdown - UPDATED WITH REWORK
  */
 function createStatusBreakdown(sheet, teams, startRow) {
   // Section header
-  sheet.getRange(startRow, 1, 1, 10).merge();
+  sheet.getRange(startRow, 1, 1, 12).merge(); // Extended for rework column
   const sectionHeader = sheet.getRange(startRow, 1);
   sectionHeader.setValue('STATUS BREAKDOWN BY TEAM');
   sectionHeader.setFontSize(16);
@@ -511,7 +573,7 @@ function createStatusBreakdown(sheet, teams, startRow) {
   
   teams.forEach(team => {
     // Team header
-    sheet.getRange(breakdownRow, 1, 1, 10).merge();
+    sheet.getRange(breakdownRow, 1, 1, 12).merge();
     const teamHeader = sheet.getRange(breakdownRow, 1);
     teamHeader.setValue(`${team.config.name} - Lead: ${team.config.leadName}`);
     teamHeader.setFontWeight('bold');
@@ -519,12 +581,13 @@ function createStatusBreakdown(sheet, teams, startRow) {
     
     breakdownRow++;
     
-    // Status counts
+    // Status counts - UPDATED WITH REWORK
     const statuses = [
       { name: 'Not Started', count: team.stats.notStarted, color: CONFIG.COLORS.NOT_STARTED },
       { name: 'In Progress', count: team.stats.inProgress, color: CONFIG.COLORS.IN_PROGRESS },
       { name: 'In Review', count: team.stats.review, color: CONFIG.COLORS.REVIEW },
       { name: 'Completed', count: team.stats.completed, color: CONFIG.COLORS.COMPLETED },
+      { name: 'Rework', count: team.stats.rework, color: CONFIG.COLORS.REWORK }, // Added rework
       { name: 'Issues', count: team.stats.issues, color: CONFIG.COLORS.ISSUES }
     ];
     
@@ -577,11 +640,11 @@ function createProgressBar(sheet, row, col, percentage) {
 }
 
 /**
- * Formats the entire dashboard
+ * Formats the entire dashboard - UPDATED FOR REWORK COLUMN
  */
 function formatDashboard(sheet) {
   // Auto-resize columns
-  sheet.autoResizeColumns(1, 12);
+  sheet.autoResizeColumns(1, 14); // Extended to include rework column
   
   // Set minimum column widths
   sheet.setColumnWidth(1, 200); // Team name column
@@ -592,7 +655,7 @@ function formatDashboard(sheet) {
   dataRange.setBorder(true, true, true, true, false, false, CONFIG.COLORS.BORDER, SpreadsheetApp.BorderStyle.SOLID);
   
   // Center align numeric columns
-  for (let col = 3; col <= 11; col++) {
+  for (let col = 3; col <= 13; col++) { // Extended to include rework column
     sheet.getRange(1, col, sheet.getMaxRows()).setHorizontalAlignment('center');
   }
   
